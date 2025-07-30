@@ -3,7 +3,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "code-tools"
+name = "code-tools-agent"
 version = "0.1.0"
 description = "A powerful framework for providing tools to AI agents with Docker/local deployment support"
 license = "MIT"

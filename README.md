@@ -10,7 +10,7 @@ CodeInstance is a class that wraps deployment environments (Docker/local) and pr
 You can install the package using pip:
 
 ```bash
-pip install code-tools
+pip install code-tools-agent
 ```
 
 Or for development:
