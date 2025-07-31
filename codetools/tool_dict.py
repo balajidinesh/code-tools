@@ -140,29 +140,32 @@ Suggestions:
 """,
 
 "run_command" : """
-Executes a one-time shell command in non-interactive mode.
+    Executes a single shell command in non-interactive, stateless mode.
 
-Recommended for simple commands with no state persistence.
-Avoid using for REPLs, interactive scripts, or multi-step commands.
+    Intended for straightforward, short-lived commands. This function does *not* maintain shell state, support interactive input (like prompts or REPLs), or handle long-running builds gracefully. If your workflow needs any of that, this is probably not the tool you want — unless, of course, it's the only one you have.
 
-Usage:
-    await run_command("ls -al", directory="src")
+    Args:
+        command (str): Shell command to run.
+        directory (Optional[str]): Directory in which to execute the command.
+        timeout (Optional[float]): Max time (in seconds) to wait before forcefully terminating the command. Defaults to 60 seconds.
 
-Args:
-    command (str): Shell command to run.
-    directory (Optional[str]): Working directory.
+    Returns:
+        CommandResponse:
+            - stdout: Standard output of the command.
+            - stderr: Standard error of the command.
+            - exit_code: Integer exit code.
+            - command: The original command string.
 
-Returns:
-    CommandResponse:
-        - stdout, stderr, exit_code, command
+    Behavior Notes:
+        - Commands that prompt for input will hang or fail silently.
+        - Processes exceeding the timeout will be killed.
+        - A non-zero exit code will be treated as a failure — as it should be.
 
-Possible Failures:
-    - Command not found
-    - Syntax errors
-    - Permission issues
+    Suggestions:
+        • If you're stuck with just this function: favor simple, deterministic commands. For anything resembling a build, CI setup, or anything with a progress bar, use `nohup`, backgrounding (`&`), and log redirection (`> file.log 2>&1`) to work around limitations.
+        • If you happen to have access to more capable tools (persistent sessions, file readers, interactive shells, etc.), you might want to use those instead for multi-step workflows or anything stateful.
 
-Suggestions:
-    - Use `run_bash_session()` for stateful or interactive operations.
+    Use wisely. Or at least pragmatically.
 """,
 
 "run_bash_session" : """
@@ -364,19 +367,3 @@ Suggestions:
     - Use `grep_files()` for more flexible pattern search.
 """
 }
-# print(tool_dic)
-
-# tool_dic = {
-#     'read_file': '\nReads content from a file with optional line-based pagination.\n\nThis tool is intended for reading text files only. It tracks read operations\nfor later validation in write/edit commands. If the file is binary or unreadable\ndue to permissions or encoding, it returns a structured error.\n\nUsage:\n    await read_file("README.md", offset=1, limit=50)\n\nArgs:\n    path (str): File path to read.\n    offset (Optional[int]): Starting line number (1-based). Defaults to config default.\n    limit (Optional[int]): Number of lines to read. Defaults to config default.\n    encoding (Optional[str]): Encoding to use. Defaults to system default.\n\nReturns:\n    FileReadResponse:\n        - content (str): File content (possibly truncated).\n        - lines_shown (int), total_lines (int), is_truncated (bool)\n\nPossible Failures:\n    - File not found\n    - Invalid encoding\n    - Binary file (unsupported)\n    - Permission issues\n\nSuggestions:\n    - Use `list_directory()` or `glob_files()` to find valid file paths.\n    - Ensure encoding matches file format.\n',
-#     'write_file': '\nWrites text content to a file, with overwrite protection.\n\nTo avoid accidental modification of unknown files, writing to an existing file\nrequires it to have been read first — unless `force=True`.\n\nUsage:\n    await write_file("example.txt", "new content", force=True)\n\nArgs:\n    path (str): Path to file to write.\n    content (str): Text content to write.\n    force (bool): Set to True to bypass read-before-write check.\n    encoding (Optional[str]): Text encoding (default: system default).\n\nReturns:\n    FileWriteResponse:\n        - bytes_written (int)\n\nPossible Failures:\n    - Path invalid or unwritable\n    - File not read beforehand (if force=False)\n    - Permission or disk issues\n\nSuggestions:\n    - Use `read_file()` before editing.\n    - Set `force=True` if you\'re sure you want to overwrite.\n',
-#     'edit_file': '\nPerforms text replacement in a file.\n\nSupports both single and full replacement modes. The file must be read first\nbefore edits are allowed for safety.\n\nUsage:\n    await edit_file("code.py", "old_function()", "new_function()", replace_all=True)\n\nArgs:\n    path (str): Path to the file to edit.\n    old_string (str): Text to search for.\n    new_string (str): Replacement text.\n    replace_all (bool): If True, replace all instances. Default is first match only.\n\nReturns:\n    FileEditResponse:\n        - replacements_made (int)\n        - preview (str): Change preview (first line diff)\n\nPossible Failures:\n    - File unread or not previously read\n    - Match string not found\n    - Write failure after edit\n\nSuggestions:\n    - Use `read_file()` before edit.\n    - Ensure exact match in whitespace and formatting.\n',
-#     'list_directory': '\nLists files and directories in a path with metadata.\n\nSupports ignore patterns (regex) for filtering out noisy entries such as `.git`\nor `node_modules`.\n\nUsage:\n    await list_directory(".", ignore=["__pycache__"])\n\nArgs:\n    path (str): Path to the directory to list.\n    ignore (List[str]): Regex patterns to ignore (e.g., r"\\.git", r"__pycache__").\n\nReturns:\n    List[Dict]:\n        - name, path, type ("file"/"directory"), size, is_text, etc.\n\nPossible Failures:\n    - Invalid or inaccessible directory path\n    - Permission issues\n\nSuggestions:\n    - Use `glob_files()` to match specific file types.\n    - Double-check directory path if result is empty.\n',
-#     'create_bash_session': '\nCreates a named persistent bash session.\n\nSessions preserve environment, working directory, and state across commands.\nUse when chaining multiple operations or running interactive shells.\n\nUsage:\n    await create_bash_session("dev-shell")\n\nArgs:\n    session_name (Optional[str]): Name for the session. Defaults to config.\n\nReturns:\n    ToolResponse with session creation status.\n\nPossible Failures:\n    - Session already exists\n\nSuggestions:\n    - Use `get_bash_sessions()` to list existing ones.\n    - Use `close_bash_session()` to close stale sessions.\n',
-#     'run_command': '\nExecutes a one-time shell command in non-interactive mode.\n\nRecommended for simple commands with no state persistence.\nAvoid using for REPLs, interactive scripts, or multi-step commands.\n\nUsage:\n    await run_command("ls -al", directory="src")\n\nArgs:\n    command (str): Shell command to run.\n    directory (Optional[str]): Working directory.\n\nReturns:\n    CommandResponse:\n        - stdout, stderr, exit_code, command\n\nPossible Failures:\n    - Command not found\n    - Syntax errors\n    - Permission issues\n\nSuggestions:\n    - Use `run_bash_session()` for stateful or interactive operations.\n',
-#     'run_bash_session': '\nRuns a command in a persistent interactive bash session.\n\nUse this for programs that require input/output interactivity,\nenvironment continuity, or multi-step workflows.\n\nSuggestion : \nInteractive commands (use interactiev=False more often): Avoid commands that require interactive user input, as this can cause the tool to hang. Use non-interactive flags if available (e.g., npm init -y).\n\nUsage:\n    await run_bash_session("python3", session_name="py-dev", interactive=True)\n\nArgs:\n    command (str): Command to run.\n    session_name (Optional[str]): Session name. Defaults to config.\n    timeout (Optional[float]): Max run time in seconds.\n    interrupt (bool): Interrupt session instead of running command.\n    interactive (Optional[bool]): Force interactive mode. checks using possible interactive expects using pyexpect.\n\nReturns:\n    CommandResponse:\n        - stdout, stderr, session_name, is_interactive, expect_string\n\nPossible Failures:\n    - Session creation failed\n    - Unexpected command behavior in interactive mode\n\nSuggestions:\n    - Avoid long-running sessions without timeout.\n    - Use `interrupt=True` to stop hanging sessions.\n',
-#     'glob_files': '\nSearch for a regex pattern across multiple files.\n\nSupports directory-wide search using `grep` combined with `find`. Useful for\ntracing usage of functions, variables, or keywords. Allows file filtering via extension.\n\nUsage:\n    await grep_files(pattern="def ", path="src", include="*.py")\n\nArgs:\n    pattern (str): Regex pattern to search for (e.g., "import .*").\n    path (str): Base directory to search in.\n    include (str): File glob to restrict search scope (e.g., "*.js").\n\nReturns:\n    List[Dict]:\n        - file (str): File path\n        - line (int): Line number\n        - content (str): Line text\n\nPossible Failures:\n    - No matches\n    - Invalid regex\n    - Permission errors on files\n\nSuggestions:\n    - Use `glob_files()` first to preview candidate files.\n    - Keep patterns simple for performance.\n',
-#     'format_code': '\nFormat a source code file using the appropriate formatter.\n\nAuto-selects formatter based on file extension. Supports Python, JS/TS, Go,\nRust, C/C++, Java, and more. You can override the formatter explicitly.\n\nUsage:\n    await format_code("app.py")\n    await format_code("style.scss", formatter="prettier")\n\nArgs:\n    file_path (str): Path to the file to format.\n    formatter (Optional[str]): Formatter name (e.g., "black", "prettier").\n\nReturns:\n    bool: True if formatting succeeded, or error dict on failure.\n\nPossible Failures:\n    - Unsupported file type\n    - Missing formatter binary\n    - Invalid syntax in file\n\nSuggestions:\n    - Use `read_file()` to inspect file content first.\n    - Ensure formatter is installed in runtime environment.\n',
-#     'analyze_project_structure': '\nScans a project directory and summarizes its structure.\n\nDetects language distribution, file type breakdown, project type (e.g., Python, Node),\nmain directories (e.g., src/, tests/), config files, and overall stats.\n\nUsage:\n    await analyze_project_structure(".")\n\nArgs:\n    path (str): Root directory to analyze.\n\nReturns:\n    Dict:\n        - root_path (str)\n        - total_files (int), total_size (bytes)\n        - files_by_type (Dict[str, int])\n        - languages (Dict[str, int])\n        - project_type (str)\n        - config_files (List[str])\n        - main_directories (List[str])\n\nPossible Failures:\n    - Invalid or non-directory path\n    - Permission denied while traversing\n\nSuggestions:\n    - Use `list_directory()` to verify path first.\n    - Clean up large or unused directories before analyzing.\n',
-#     'get_file_dependencies': '\nExtracts import or dependency statements from a source file.\n\nSupports multiple languages (Python, JS/TS, Go, Rust, Java). Returns only\nstatic imports; dynamic or runtime-loading statements are not detected.\n\nUsage:\n    await get_file_dependencies("main.py")\n\nArgs:\n    file_path (str): Path to the file to scan.\n\nReturns:\n    List[str]: Lines representing dependency statements.\n\nPossible Failures:\n    - File not found or unreadable\n    - Unsupported file type\n    - Binary or non-text file\n\nSuggestions:\n    - Use `read_file()` to confirm text content.\n    - Manually inspect complex import styles.\n',
-#     'find_references': '\nFind references to a symbol in the codebase.\n\nSearches for exact word-boundary matches across code files using `grep`. Can\nbe filtered by file type (e.g., only `.py` or `.js` files).\n\nUsage:\n    await find_references("my_function", file_types=[".py", ".pyi"])\n\nArgs:\n    symbol (str): Symbol name to search for.\n    file_types (List[str]): List of file extensions to restrict search.\n\nReturns:\n    List[Dict]:\n        - symbol (str), file (str), line (int), content (str)\n\nPossible Failures:\n    - Symbol not found\n    - Grep execution error\n\nSuggestions:\n    - Ensure symbol is a full identifier (e.g., function, class name).\n    - Use `grep_files()` for more flexible pattern search.\n'
-#     }

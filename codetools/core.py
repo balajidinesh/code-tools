@@ -835,8 +835,6 @@ class CodeToolsInstance:
         """
         Close a specific bash session using SWE Rex native functionality.
 
-        
-        
         Args:
             session_name: Name of session to close
             
@@ -868,43 +866,62 @@ class CodeToolsInstance:
     
     # === SHELL OPERATIONS ===
     
-    async def run_command(self, command: str, directory: Optional[str] = None) -> CommandResponse:
+    async def run_command(
+        self,
+        command: str,
+        directory: Optional[str] = None,
+        timeout: Optional[float] = None
+    ) -> CommandResponse:
         """
-        Execute one-off command using SWE Rex native functionality.
-        
-        Use this method for simple, independent commands that don't require:
-        - Persistent environment variables
-        - Interactive input/output
-        - Chained command sequences
-        - State preservation between commands
-        
-        For interactive workflows or command sequences, use run_bash_session() instead.
-        
+        Executes a single shell command in non-interactive, stateless mode.
+
+        Intended for straightforward, short-lived commands. This function does *not* maintain shell state, support interactive input (like prompts or REPLs), or handle long-running builds gracefully. If your workflow needs any of that, this is probably not the tool you want — unless, of course, it's the only one you have.
+
         Args:
-            command: Shell command to execute
-            directory: Working directory (optional)
-            
+            command (str): Shell command to run.
+            directory (Optional[str]): Directory in which to execute the command.
+            timeout (Optional[float]): Max time (in seconds) to wait before forcefully terminating the command. Defaults to 60 seconds.
+
         Returns:
-            CommandResponse with execution results
+            CommandResponse:
+                - stdout: Standard output of the command.
+                - stderr: Standard error of the command.
+                - exit_code: Integer exit code.
+                - command: The original command string.
+
+        Behavior Notes:
+            - Commands that prompt for input will hang or fail silently.
+            - Processes exceeding the timeout will be killed.
+            - A non-zero exit code will be treated as a failure — as it should be.
+
+        Suggestions:
+            • If you're stuck with just this function: favor simple, deterministic commands. For anything resembling a build, CI setup, or anything with a progress bar, use `nohup`, backgrounding (`&`), and log redirection (`> file.log 2>&1`) to work around limitations.
+            • If you happen to have access to more capable tools (persistent sessions, file readers, interactive shells, etc.), you might want to use those instead for multi-step workflows or anything stateful.
+
+        Use wisely. Or at least pragmatically.
         """
         try:
+            if timeout is None : 
+                timeout = self.default_config.timeout
             cmd_obj = Command(
                 command=command,
                 shell=True,
-                cwd=directory
+                cwd=directory,
+                timeout=timeout,
+                check=True,  # ensure failure propagation
             )
-            
+
             response = await self.runtime.execute(cmd_obj)
-            
+
             return self._create_success_response(
                 CommandResponse,
-                "Command executed" if response.exit_code == 0 else "Command completed with errors",
+                "Command executed successfully.",
                 stdout=response.stdout,
                 stderr=response.stderr,
                 exit_code=response.exit_code,
                 command=command
             )
-            
+
         except Exception as e:
             return CommandResponse(
                 success=False,

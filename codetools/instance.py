@@ -5,6 +5,7 @@ import functools
 import inspect
 import subprocess
 import logging
+import datetime
 from typing import Optional, Dict, List, Any, Union
 
 
@@ -29,6 +30,7 @@ class CodeInstance:
         self._is_started = False
         self._cleanup_registered = False
         self._swerex_handler = None  # Track our swerex handler for cleanup
+        self._tool_call_history = []  # Store detailed history of tool calls
         
         # Setup internal swerex logging without affecting user's logging
         self._setup_swerex_logging()
@@ -423,6 +425,29 @@ class CodeInstance:
         """Export tool statistics to JSON format"""
         return self.stats.export_stats_to_json()
     
+    def get_history(self):
+        """Get detailed history of all tool calls with parameters and outputs"""
+        return self._tool_call_history.copy()
+    
+    def print_history(self):
+        """Print the complete history of tool calls in a readable format"""
+        if not self._tool_call_history:
+            print("No tool calls have been made yet.")
+            return
+        
+        print(f"\n=== Tool Call History ({len(self._tool_call_history)} calls) ===")
+        for i, call in enumerate(self._tool_call_history, 1):
+            print(f"\n{i}. Tool: {call['tool_name']}")
+            print(f"   Timestamp: {call['timestamp']}")
+            print(f"   Parameters: {call['parameters']}")
+            print(f"   Success: {call['success']}")
+            if call['success']:
+                print(f"   Output: {call['output'][:500]}{'...' if len(str(call['output'])) > 500 else ''}")
+            else:
+                print(f"   Error: {call['error_message']}")
+            print(f"   Duration: {call['duration']:.3f}s")
+            print("-" * 50)
+    
     def get_method_tools(self):
         new_method_list = []
         for key in tool_dict:
@@ -496,6 +521,7 @@ class CodeInstance:
                 def tool_func(**kwargs):
                     # Record call start and track statistics
                     start_time = stats_obj.record_call_start(func.__name__)
+                    call_timestamp = datetime.datetime.now().isoformat()
                     
                     try:
                         if is_async:
@@ -540,11 +566,48 @@ class CodeInstance:
                         stats_obj.record_call_end(func.__name__, start_time, success=True)
                         
                         # Convert response objects to string format for agent compatibility
-                        return self._format_tool_response(result, func.__name__)
+                        formatted_result = self._format_tool_response(result, func.__name__)
+                        
+                        # Calculate duration
+                        import time
+                        end_time = time.time()
+                        duration = end_time - start_time
+                        
+                        # Add to history
+                        history_entry = {
+                            'tool_name': func.__name__,
+                            'timestamp': call_timestamp,
+                            'parameters': kwargs.copy(),
+                            'success': True,
+                            'output': formatted_result,
+                            'error_message': None,
+                            'duration': duration
+                        }
+                        self._tool_call_history.append(history_entry)
+                        
+                        return formatted_result
                         
                     except Exception as e:
                         # Record failed completion
                         stats_obj.record_call_end(func.__name__, start_time, success=False, error_message=str(e))
+                        
+                        # Calculate duration
+                        import time
+                        end_time = time.time()
+                        duration = end_time - start_time
+                        
+                        # Add failed call to history
+                        history_entry = {
+                            'tool_name': func.__name__,
+                            'timestamp': call_timestamp,
+                            'parameters': kwargs.copy(),
+                            'success': False,
+                            'output': None,
+                            'error_message': str(e),
+                            'duration': duration
+                        }
+                        self._tool_call_history.append(history_entry)
+                        
                         # Re-raise the exception to maintain original behavior
                         raise
 
