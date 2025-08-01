@@ -504,7 +504,7 @@ class CodeInstance:
                 if name not in instance_methods:
                     raise ValueError(f"Inbuilt method '{name}' not found in the instance.")
                 method = instance_methods[name]
-            else: 
+            else: # TODO Add custom tool like finish and sleep
                 if name not in instance_methods:
                     raise ValueError(f"Inbuilt method '{name}' not found in the instance.")
                 method = instance_methods[name]

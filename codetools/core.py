@@ -908,7 +908,7 @@ class CodeToolsInstance:
                 shell=True,
                 cwd=directory,
                 timeout=timeout,
-                check=True,  # ensure failure propagation
+                # check=True,  # ensure failure propagation
             )
 
             response = await self.runtime.execute(cmd_obj)
